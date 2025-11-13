@@ -126,8 +126,8 @@ No additional restrictions: You may not apply legal terms or technological measu
   <worldbody>
     <body childclass="Sterilite_Caddy_Blue_Sky_17_58_x_12_58_x_9_14" pos="0 0 0">
       <freejoint/>
-      <site name="left_containment" type="box" pos="-0.064 0.0 0.05" size="0.05 0.14 0.05" rgba="1.0 1.0 1.0 1.0" group="5"/>
-      <site name="right_containment" type="box" pos="0.07 0.0 0.05" size="0.05 0.14 0.05" rgba="1.0 1.0 1.0 1.0" group="5"/>
+      <site name="left_containment" type="box" pos="-0.07 0.0 0.08" size="0.05 0.14 0.075" rgba="1.0 1.0 1.0 1.0" group="5"/>
+      <site name="right_containment" type="box" pos="0.075 0.0 0.08" size="0.05 0.14 0.075" rgba="1.0 1.0 1.0 1.0" group="5"/>
       <geom class="visual_Sterilite_Caddy_Blue_Sky_17_58_x_12_58_x_9_14" mesh="model"/>
       <geom class="collision_Sterilite_Caddy_Blue_Sky_17_58_x_12_58_x_9_14" mesh="coacd_part_000" rgba="0.375 0.95 0.73 1"/>
       <geom class="collision_Sterilite_Caddy_Blue_Sky_17_58_x_12_58_x_9_14" mesh="coacd_part_001" rgba="0.599 0.16 0.16 1"/>

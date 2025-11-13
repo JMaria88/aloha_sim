@@ -131,6 +131,8 @@ def create_task_env(
   signature = inspect.signature(task_class.__init__)
   task_class_kwargs = set(signature.parameters.keys())
   task_class_kwargs.remove('self')
+  # adding allowed args in base classes
+  task_class_kwargs.add('mjcf_root')
   kwargs = {k: v for k, v in kwargs.items() if k in task_class_kwargs}
   constructor_kwargs = {
       'control_timestep': control_timestep,

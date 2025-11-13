@@ -45,6 +45,7 @@ No additional restrictions: You may not apply legal terms or technological measu
   <worldbody>
     <body childclass="Kingston_DT4000MR_G2_Management_Ready_USB_64GB" pos="0 0 0.1">
       <freejoint/>
+      <site name="tool_handle" pos="0.0 0.0 0.007" quat="1 0 0 0" size="0.01 0.01 0.01" group="5"/>
       <geom class="visual_Kingston_DT4000MR_G2_Management_Ready_USB_64GB" mesh="model"/>
       <geom class="collision_Kingston_DT4000MR_G2_Management_Ready_USB_64GB" mesh="coacd_part_000" rgba="0.375 0.95 0.73 1"/>
     </body>

@@ -58,6 +58,8 @@ No additional restrictions: You may not apply legal terms or technological measu
   <worldbody>
     <body childclass="Granimals_20_Wooden_ABC_Blocks_Wagon" pos="0 0 0.1">
       <freejoint/>
+      <site name="tool_handle" pos="0.05 0.0 0.015" quat="1 0 0 0" size="0.01 0.01 0.01" group="5"/>
+      <site name="tool_end" pos="-0.05 0.0 0.015" quat="1 0 0 0" size="0.01 0.01 0.01" group="5"/>
       <geom class="visual_Granimals_20_Wooden_ABC_Blocks_Wagon" mesh="model"/>
       <geom class="collision_Granimals_20_Wooden_ABC_Blocks_Wagon" mesh="coacd_part_000" rgba="0.375 0.95 0.73 1"/>
       <geom class="collision_Granimals_20_Wooden_ABC_Blocks_Wagon" mesh="coacd_part_001" rgba="0.599 0.16 0.16 1"/>

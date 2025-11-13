@@ -54,6 +54,8 @@ No additional restrictions: You may not apply legal terms or technological measu
 
   <worldbody>
     <body childclass="Magnifying_Glassassrt" pos="0 0 0.1">
+      <site name="tool_handle" pos="0.05 0.0 0.01" quat="1 0 0 0" size="0.01 0.01 0.01" group="5"/>
+      <site name="tool_end" pos="-0.04 0.0 0.01" quat="1 0 0 0" size="0.01 0.01 0.01" group="5"/>
       <freejoint/>
       <geom class="visual_Magnifying_Glassassrt" mesh="model"/>
       <geom class="collision_Magnifying_Glassassrt" mesh="coacd_part_000" rgba="0.375 0.95 0.73 1"/>

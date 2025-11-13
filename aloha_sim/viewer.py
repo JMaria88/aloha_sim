@@ -32,9 +32,9 @@ When the environment is running:
 - ctrl + mouse right applies force to an object
 """
 
+import copy
 import time
-from typing import Any, Sequence, TypeAlias
-
+from typing import Sequence
 from absl import app
 from absl import flags
 from absl import logging
@@ -42,6 +42,9 @@ from aloha_sim import task_suite
 from dm_control import composer
 import dm_env
 from dm_env import specs
+from gdm_robotics.adapters import dm_env_to_gdmr_env_wrapper
+from gdm_robotics.interfaces import policy as gdmr_policy
+from gdm_robotics.interfaces import types as gdmr_types
 import mujoco
 import mujoco.viewer
 import numpy as np
@@ -49,15 +52,8 @@ from rich import console
 from rich import panel
 from rich import prompt
 from rich import text
-import tree
+from typing_extensions import override
 
-
-ActionSpec: TypeAlias = specs.Array
-ExtraOutputSpec: TypeAlias = tree.Structure[specs.Array]
-StateSpec: TypeAlias = tree.Structure[specs.Array]
-State: TypeAlias = tree.Structure[np.typing.ArrayLike]
-Action: TypeAlias = np.typing.ArrayLike
-ExtraOutput: TypeAlias = tree.Structure[np.typing.ArrayLike]
 
 _TASK_NAME = flags.DEFINE_enum(
     'task_name',
@@ -108,20 +104,43 @@ _INIT_ACTION = np.asarray([
 _SERVE_ID = 'gemini_robotics_on_device'
 
 
-class NoPolicy:
+class NoPolicy(gdmr_policy.Policy[np.ndarray]):
   """A no-op policy that always returns the initial action."""
 
-  def step(self, unused_observation: Any) -> np.ndarray:
-    return _INIT_ACTION
+  def __init__(self):
+    self._dummy_state = np.zeros(())
 
-  def reset(self) -> None:
-    pass
+  @override
+  def step(
+      self,
+      timestep: dm_env.TimeStep,
+      prev_state: gdmr_types.StateStructure[np.ndarray],
+  ) -> tuple[
+      tuple[
+          gdmr_types.ActionType,
+          gdmr_types.ExtraOutputStructure[np.ndarray],
+      ],
+      gdmr_types.StateStructure[np.ndarray],
+  ]:
+    return (_INIT_ACTION, {}), self._dummy_state
 
-  def set_task_instruction(self, unused_instruction: str) -> None:
-    pass
+  @override
+  def initial_state(
+      self,
+  ) -> gdmr_types.StateStructure[np.ndarray]:
+    """Returns the policy initial state."""
+    return self._dummy_state
 
-  def setup(self) -> None:
-    pass
+  @override
+  def step_spec(self, timestep_spec: gdmr_types.TimeStepSpec) -> tuple[
+      tuple[gdmr_types.ActionSpec, gdmr_types.ExtraOutputSpec],
+      gdmr_types.StateSpec,
+  ]:
+    """Returns the spec of the ((action, extra), state) from `step` method."""
+    return (
+        gdmr_types.UnboundedArraySpec(shape=(14,), dtype=np.float32),
+        {},
+    ), specs.Array(shape=(), dtype=np.float32)
 
 
 def _key_callback(key: int) -> None:
@@ -143,11 +162,18 @@ def _key_callback(key: int) -> None:
     logging.info('UNKNOWN KEY PRESS = %s', key)
 
 
+def _append_task_instruction(
+    timestep: dm_env.TimeStep, instruction: str
+) -> dm_env.TimeStep:
+  """Appends the task instruction to timestep observation."""
+  new_observations = timestep.observation
+  new_observations.update({'instruction': np.array(instruction)})
+  return timestep._replace(observation=new_observations)
+
+
 def main(argv: Sequence[str]) -> None:
   if len(argv) > 2:
-    raise app.UsageError(
-        'Too many command-line arguments.'
-    )
+    raise app.UsageError('Too many command-line arguments.')
 
   logging.info('Initializing %s environment...', _TASK_NAME.value)
   if _TASK_NAME.value not in task_suite.TASK_FACTORIES.keys():
@@ -169,6 +195,15 @@ def main(argv: Sequence[str]) -> None:
   )
   env.reset()
 
+  viewer_model = env.physics.model.ptr
+  viewer_data = env.physics.data.ptr
+  env = dm_env_to_gdmr_env_wrapper.DmEnvToGdmrEnvWrapper(env)
+  # Update the spec to include the instruction as we add it manually in our
+  # runloop.
+  timestep_spec = copy.deepcopy(env.timestep_spec())
+  assert isinstance(timestep_spec.observation, dict)
+  timestep_spec.observation.update({'instruction': specs.StringArray(shape=())})
+
   # Instantiate the policy.
   if _POLICY.value == 'no_policy':
     policy = NoPolicy()
@@ -176,19 +211,19 @@ def main(argv: Sequence[str]) -> None:
     try:
       print('Creating policy...')
       # Import safari_sdk only when needed for inference
+      from safari_sdk.model import constants
       from safari_sdk.model import gemini_robotics_policy
-      from safari_sdk.model import genai_robotics
 
       policy = gemini_robotics_policy.GeminiRoboticsPolicy(
           serve_id=_SERVE_ID,
-          task_instruction=env.task.get_instruction(),
-          inference_mode=gemini_robotics_policy.InferenceMode.SYNCHRONOUS,
-          cameras=_ALOHA_CAMERAS,
-          joints=_ALOHA_JOINTS,
+          task_instruction_key='instruction',
+          image_observation_keys=_ALOHA_CAMERAS.keys(),
+          proprioceptive_observation_keys=_ALOHA_JOINTS.keys(),
           min_replan_interval=25,
-          robotics_api_connection=genai_robotics.RoboticsApiConnectionType.LOCAL,
+          inference_mode=constants.InferenceMode.SYNCHRONOUS,
+          robotics_api_connection=constants.RoboticsApiConnectionType.LOCAL,
       )
-      policy.setup()  # Initialize the policy
+      policy.step_spec(timestep_spec)  # Initialize the policy
       print('GeminiRoboticsPolicy initialized successfully.')
     except ModuleNotFoundError:
       rich_console = console.Console()
@@ -226,8 +261,6 @@ def main(argv: Sequence[str]) -> None:
   logging.info('Running policy...')
 
   logging.info('Launching viewer...')
-  viewer_model = env.physics.model.ptr
-  viewer_data = env.physics.data.ptr
   with mujoco.viewer.launch_passive(
       viewer_model, viewer_data, key_callback=_key_callback
   ) as viewer_handle:
@@ -237,8 +270,8 @@ def main(argv: Sequence[str]) -> None:
     )
     while viewer_handle.is_running():
       timestep = env.reset()
-      policy.reset()
       instruction = task.get_instruction()
+      policy_state = policy.initial_state()
       viewer_handle.sync()
 
       steps = 0
@@ -253,13 +286,13 @@ def main(argv: Sequence[str]) -> None:
               'Enter new instruction. Press enter to use current instruction',
               default=instruction,
           )
-          policy.set_task_instruction(instruction)
           logging.info('Using instruction: %s', instruction)
           _GLOBAL_STATE['_ASKING_INSTRUCTION'] = False
           _GLOBAL_STATE['_IS_RUNNING'] = True
         if _GLOBAL_STATE['_IS_RUNNING'] or _GLOBAL_STATE['_SINGLE_STEP']:
           frame_start_time = time.time()
-          action = policy.step(timestep.observation)
+          timestep = _append_task_instruction(timestep, instruction)
+          (action, _), policy_state = policy.step(timestep, policy_state)
           query_end_time = time.time()
           time_inference += query_end_time - frame_start_time
 
@@ -313,18 +346,18 @@ def main(argv: Sequence[str]) -> None:
           if viewer_handle.perturb.active:
             if _GLOBAL_STATE['_IS_RUNNING']:
               mujoco.mjv_applyPerturbForce(
-                  env.physics.model.ptr,
-                  env.physics.data.ptr,
+                  viewer_model,
+                  viewer_data,
                   viewer_handle.perturb,
               )
             else:
               mujoco.mjv_applyPerturbPose(
-                  env.physics.model.ptr,
-                  env.physics.data.ptr,
+                  viewer_model,
+                  viewer_data,
                   viewer_handle.perturb,
                   flg_paused=1,
               )
-              mujoco.mj_kinematics(env.physics.model.ptr, env.physics.data.ptr)
+              mujoco.mj_kinematics(viewer_model, viewer_data)
           viewer_handle.sync()
 
         if not _GLOBAL_STATE['_IS_RUNNING']:

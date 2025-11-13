@@ -161,6 +161,7 @@ class AlohaTask(composer.Task):
       table_height_offset: float = _DEFAULT_TABLE_HEIGHT_OFFSET,
       waist_joint_limit: float = np.pi / 2,
       terminate_episode=True,
+      mjcf_root: str | None = None,
   ):
     """Initializes a new aloha task.
 
@@ -172,19 +173,20 @@ class AlohaTask(composer.Task):
         can be a number or a composer.Variation. If set, also adds
         `undelayed_joints_pos` and `undelayed_joints_vel` observables for
         debugging.
-      image_observation_enabled: Whether to enable physics state
-        observation, as defined by `physics.get_state()`.
-      image_observation_delay_secs: The delay of the
-        `delayed_physics_state` observable. Note that the `physics_state`
-        observable is not delayed. This can be a number or a composer.Variation.
-        When set this also delays the camera observations.
-      update_interval: An integer, number of simulation steps between
-        successive updates to the value of this observable.
+      image_observation_enabled: Whether to enable physics state observation, as
+        defined by `physics.get_state()`.
+      image_observation_delay_secs: The delay of the `delayed_physics_state`
+        observable. Note that the `physics_state` observable is not delayed.
+        This can be a number or a composer.Variation. When set this also delays
+        the camera observations.
+      update_interval: An integer, number of simulation steps between successive
+        updates to the value of this observable.
       table_height_offset: The offset to the height of the table in meters.
       waist_joint_limit: The joint limit for the waist joint, in radians. Only
         affects the action spec.
-      terminate_episode: Whether to terminate the episode when the task 
+      terminate_episode: Whether to terminate the episode when the task
         succeeds.
+      mjcf_root: The path to the scene XML file.
     """
 
     self._waist_joint_limit = waist_joint_limit
@@ -193,6 +195,7 @@ class AlohaTask(composer.Task):
     self._scene = Arena(
         camera_resolution=camera_resolution,
         table_height_offset=table_height_offset,
+        mjcf_root_path=mjcf_root,
     )
     self._scene.mjcf_model.option.flag.multiccd = 'enable'
     self._scene.mjcf_model.option.noslip_iterations = 0
@@ -467,11 +470,13 @@ class Arena(composer.Arena):
       *args,
       camera_resolution,
       table_height_offset=0.0,
+      mjcf_root_path: str | None = None,
       **kwargs,
   ):
     self._camera_resolution = camera_resolution
     self._table_height_offset = table_height_offset
     self.textures = []
+    self._mjcf_root_path = mjcf_root_path
     super().__init__(*args, **kwargs)
 
   def _build(self, name: str | None = None) -> None:
@@ -481,12 +486,15 @@ class Arena(composer.Arena):
       name: (optional) A string, the name of this arena. If `None`, use the
         model name defined in the MJCF file.
     """
-    assets_dir = os.path.join(os.path.dirname(__file__), '../../assets')
+    if not self._mjcf_root_path:
+      self._mjcf_root_path = os.path.join(
+          os.path.dirname(__file__),
+          '../../assets',
+          'aloha/scene_pbr.xml',
+      )
+
     self._mjcf_root = mjcf.from_path(
-        os.path.join(
-            assets_dir,
-            'aloha/scene_pbr.xml',
-        ),
+        path=self._mjcf_root_path,
         escape_separators=True,
     )
     self._mjcf_root.visual.__getattr__('global').offheight = (
@@ -515,4 +523,3 @@ class Arena(composer.Arena):
           break
       if not extrusion_geom_found:
         raise ValueError('Frame extrusions not found in scene')
-

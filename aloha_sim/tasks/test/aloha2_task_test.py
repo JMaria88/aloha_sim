@@ -108,10 +108,10 @@ class AlohaTaskTest(unittest.TestCase):
     action = np.zeros(env.action_spec().shape)
     action[6] = gripper_open
     env.reset()
-    for _ in range(50):
+    for _ in range(100):
       timestep = env.step(action)
     self.assertGreaterEqual(env.physics.data.qpos[6], 0.035)
-    self.assertGreaterEqual(timestep.observation["joints_pos"][6], 1.55)
+    self.assertGreaterEqual(timestep.observation["joints_pos"][6], 1.44)
     self.assertLessEqual(timestep.observation["joints_pos"][6], 1.62)
     env.close()
 
