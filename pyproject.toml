@@ -19,6 +19,10 @@ dependencies = [
     "numpy",
     "pillow",
     "rich",
+    "torch",
+    "transformers",
+    "timm",
+    "tokenizers",
     "typing-extensions",
 ]
 

@@ -35,15 +35,23 @@ import numpy as np
 from numpy import typing as npt
 
 
-HOME_CTRL: npt.NDArray[float] = np.array(
-    [0.0, -0.96, 1.16, 0.0, -0.3, 0.0, 0.002]
+RIGHT_HOME_CTRL: npt.NDArray[float] = np.array(
+    [0.0, -0.8, 0.9, 0.0, 1.5, 0.0, 0.002]
 )
-HOME_CTRL.setflags(write=False)
-HOME_QPOS: npt.NDArray[float] = np.array(
-    [0.0, -0.959, 1.182, 0.0, -0.274, 0.0, 0.0082, 0.0082]
+RIGHT_HOME_CTRL.setflags(write=False)
+RIGHT_HOME_QPOS: npt.NDArray[float] = np.array(
+    [0.0, -0.8, 0.9, 0.0, 1.5, 0.0, 0.0082, 0.0082]
 )
-HOME_QPOS.setflags(write=False)
+RIGHT_HOME_QPOS.setflags(write=False)
 
+LEFT_HOME_CTRL: npt.NDArray[float] = np.array(
+    [0.0, -0.8, 0.9, 0.0, 0.0, 0.0, 0.002]
+)
+LEFT_HOME_CTRL.setflags(write=False)
+LEFT_HOME_QPOS: npt.NDArray[float] = np.array(
+    [0.0, -0.8, 0.9, 0.0, 0.0, 0.0, 0.0082, 0.0082]
+)
+LEFT_HOME_QPOS.setflags(write=False)
 
 # The linear displacement that corresponds to fully open and closed gripper
 # in sim. Note that the sim model does not model the dynamixel values, but
@@ -391,10 +399,10 @@ class AlohaTask(composer.Task):
   ) -> None:
     arm_joints_bound = physics.bind(self._joints)
 
-    arm_joints_bound.qpos[:8] = HOME_QPOS
-    arm_joints_bound.qpos[8:] = HOME_QPOS
+    arm_joints_bound.qpos[:8] = LEFT_HOME_QPOS
+    arm_joints_bound.qpos[8:] = RIGHT_HOME_QPOS
 
-    np.copyto(physics.data.ctrl, np.concatenate([HOME_CTRL, HOME_CTRL]))
+    np.copyto(physics.data.ctrl, np.concatenate([LEFT_HOME_CTRL, RIGHT_HOME_CTRL]))
 
     for prop_placer in self._all_prop_placers:
       prop_placer(physics, random_state)

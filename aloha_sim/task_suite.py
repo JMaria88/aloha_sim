@@ -21,10 +21,13 @@ from aloha_sim.tasks import desktop_wrap_headphone
 from aloha_sim.tasks import dining_place_in_container
 from aloha_sim.tasks import drawer_open
 from aloha_sim.tasks import hand_over
+from aloha_sim.tasks import hand_over_left_lifted
 from aloha_sim.tasks import laptop_close
 from aloha_sim.tasks import marker_remove_lid
 from aloha_sim.tasks import tools_in_caddy
 from aloha_sim.tasks import towel_fold_in_half
+from aloha_sim.tasks import pick_obj
+from aloha_sim.tasks import pick_obj_new_left_lifted
 from dm_control import composer
 import immutabledict
 import numpy as np
@@ -35,6 +38,8 @@ DEFAULT_CAMERAS = (
     'worms_eye_cam',
     'wrist_cam_left',
     'wrist_cam_right',
+    'right_base_pov',
+    'left_under_arm_pov',
 )
 
 DEFAULT_CONTROL_TIMESTEP = 0.02
@@ -58,6 +63,24 @@ TASK_FACTORIES = immutabledict.immutabledict({
     'DrawerOpen': (drawer_open.DrawerOpen, {}),
     'HandOverPen': (hand_over.HandOver, {'object_name': 'pen'}),
     'HandOverBanana': (hand_over.HandOver, {'object_name': 'banana'}),
+    'PickObjPen': (pick_obj.PickObj, {'object_name': 'pen'}),
+    'PickObjBanana': (pick_obj.PickObj, {'object_name': 'banana'}),
+    'HandOverPenLeftLifted': (
+        hand_over_left_lifted.HandOverLeftLifted,
+        {'object_name': 'pen'},
+    ),
+    'HandOverBananaLeftLifted': (
+        hand_over_left_lifted.HandOverLeftLifted,
+        {'object_name': 'banana'},
+    ),
+    'PickObjPenLeftLifted': (
+        pick_obj_new_left_lifted.PickObj,
+        {'object_name': 'pen'},
+    ),
+    'PickObjBananaLeftLifted': (
+        pick_obj_new_left_lifted.PickObj,
+        {'object_name': 'banana'},
+    ),
     'LaptopClose': (laptop_close.LaptopClose, {}),
     'MarkerRemoveLid': (marker_remove_lid.MarkerRemoveLid, {}),
     'ToolsPlaceScrewdriverInLeftCompartment': (
