@@ -17,7 +17,7 @@ from gdm_robotics.interfaces import environment as gdmr_environment
 import mediapy
 import numpy as np
 import scipy.spatial.transform as st
-from transformers import AutoModelForVision2Seq, AutoProcessor
+from transformers import AutoModelForImageTextToText, AutoProcessor
 from PIL import Image
 import torch
 
@@ -288,10 +288,10 @@ def main(_):
   device = "cuda:0" if torch.cuda.is_available() else "cpu"
   print(f"Loading openVLA model: {flags.FLAGS.openvla_model}")
   processor = AutoProcessor.from_pretrained(flags.FLAGS.openvla_model, trust_remote_code=True)
-  vla = AutoModelForVision2Seq.from_pretrained(
+  vla = AutoModelForImageTextToText.from_pretrained(
       flags.FLAGS.openvla_model,
       # attn_implementation="flash_attention_2",  # [Optional] Requires `flash_attn`
-      torch_dtype=torch.bfloat16,
+      dtype=torch.bfloat16,
       low_cpu_mem_usage=True,
       trust_remote_code=True
   ).to(device)

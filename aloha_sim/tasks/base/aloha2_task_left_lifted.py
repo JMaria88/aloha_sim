@@ -36,11 +36,11 @@ from numpy import typing as npt
 
 
 RIGHT_HOME_CTRL: npt.NDArray[float] = np.array(
-    [0.0, -0.8, 0.9, 0.0, 1.5, 0.0, 0.002]
+    [0.0, -0.8, 0.9, 0.0, 1.35, 0.0, 0.002]
 )
 RIGHT_HOME_CTRL.setflags(write=False)
 RIGHT_HOME_QPOS: npt.NDArray[float] = np.array(
-    [0.0, -0.8, 0.9, 0.0, 1.5, 0.0, 0.0082, 0.0082]
+    [0.0, -0.8, 0.9, 0.0, 1.35, 0.0, 0.0082, 0.0082]
 )
 RIGHT_HOME_QPOS.setflags(write=False)
 
