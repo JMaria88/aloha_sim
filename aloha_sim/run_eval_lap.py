@@ -169,8 +169,8 @@ def extract_lap_observation(timestep_obs, physics, home_pos=None):
             right_pos[0] = 2 * home_pos[0] - right_pos[0]
             right_pos[1] = 2 * home_pos[1] - right_pos[1]
 
-        print(right_pos)
-        print(euler)
+        # print(right_pos)
+        # print(euler)
 
         # cartesian_6d: position + rot6d from euler
         def euler_to_rot6d(euler_angles: np.ndarray) -> np.ndarray:
@@ -273,7 +273,7 @@ def get_action_from_response(response, curr_obs, physics):
         deuler = action[3:6]
 
         # deuler[0] = 0.05
-        dpos[0] = 0.01
+        # dpos[0] = 0.01
 
         dpos[0] *= -1
         dpos[1] *= -1
