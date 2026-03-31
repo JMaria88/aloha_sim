@@ -248,10 +248,7 @@ def obs_to_request(curr_obs, instruction):
 
 def get_action_from_response(response, curr_obs, physics):
     """Process LAP response to get actions using chained IK for cartesian deltas."""
-    # pred_action_chunk = response["actions"].copy()
-    pred_action_chunk = np.zeros((5, 14))  # Dummy zero actions for testing
-
-    print(pred_action_chunk)
+    pred_action_chunk = response["actions"].copy()
 
     # 1. Access site by name to prevent indexing errors if MJCF changes
     # Use the MuJoCo site name defined in your XML
@@ -503,8 +500,7 @@ def run_episode(
             request = obs_to_request(curr_obs, constant_instruction)
             if flags.FLAGS.debug_viz and (i % flags.FLAGS.debug_viz_every == 0):
                 visualize_policy_input(request, curr_obs, step=i, task_name=task_name)
-            # response = policy_client.infer(request)
-            response = {}
+            response = policy_client.infer(request)
             pred_action_chunk = get_action_from_response(
                 response, curr_obs, env.wrapped_env.physics
             )
@@ -582,9 +578,9 @@ def run_episode(
 
 def main(_):
     # Create policy client
-    # policy_client = websocket_client_policy.WebsocketClientPolicy(
-    #     flags.FLAGS.remote_host, flags.FLAGS.remote_port
-    # )
+    policy_client = websocket_client_policy.WebsocketClientPolicy(
+        flags.FLAGS.remote_host, flags.FLAGS.remote_port
+    )
 
     success_rates = {}
     all_tasks = list(task_suite.TASK_FACTORIES.keys())
@@ -625,7 +621,7 @@ def main(_):
                 task_name,
                 ep_idx,
                 env,
-                None,
+                policy_client,
                 user_instruction,
                 flags.FLAGS.open_loop_horizon,
                 steps_per_vla_action=steps_per_vla_action,
