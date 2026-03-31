@@ -96,11 +96,15 @@ def _append_task_instruction(
     return timestep._replace(observation=new_observations)
 
 
-def extract_lap_observation(timestep_obs, physics):
+def extract_lap_observation(timestep_obs, physics, home_pos=None):
     """Extract observation in LAP format mirroring real-robot `shared.py`.
 
     Returns keys expected by the LAP pipeline: images, cartesian_position,
     gripper_position, joint_position, state, plus `euler` and `qpos`.
+
+    home_pos: if provided, x and y are reflected about home to make deltas
+    consistent with the action frame (dpos[0]*=-1, dpos[1]*=-1). The absolute
+    value at home is preserved; only subsequent deltas are flipped.
     """
     SITE_NAME = "right\\gripper"
 
@@ -149,10 +153,24 @@ def extract_lap_observation(timestep_obs, physics):
     right_gripper = qpos[13]
     # Get right end-effector pose from physics (right arm is the action doer)
     try:
-        right_pos = physics.named.data.site_xpos[SITE_NAME]
+        right_pos = physics.named.data.site_xpos[SITE_NAME].copy()
         mat9 = physics.named.data.site_xmat[SITE_NAME]
         right_R = np.asarray(mat9).reshape(3, 3)
         euler = (_R_EULER_OFFSET * st.Rotation.from_matrix(right_R)).as_euler("xyz")
+        # Transform to action-consistent frame with home position = [π, 0, 0].
+        # Empirically: deuler[i]>0 causes raw_euler[2-i] to decrease, so we remap.
+        # Offsets shift the home pose (raw=[π,0,0]) to [π,0,0] in the new frame.
+        euler = np.array([np.pi - euler[2], -euler[1], np.pi - euler[0]])
+        euler = np.arctan2(np.sin(euler), np.cos(euler))  # wrap to (-π, π]
+
+        # Reflect x and y about home position so deltas are consistent with the
+        # action frame (dpos[0]*=-1, dpos[1]*=-1), preserving the absolute home value.
+        if home_pos is not None:
+            right_pos[0] = 2 * home_pos[0] - right_pos[0]
+            right_pos[1] = 2 * home_pos[1] - right_pos[1]
+
+        print(right_pos)
+        print(euler)
 
         # cartesian_6d: position + rot6d from euler
         def euler_to_rot6d(euler_angles: np.ndarray) -> np.ndarray:
@@ -230,7 +248,8 @@ def obs_to_request(curr_obs, instruction):
 
 def get_action_from_response(response, curr_obs, physics):
     """Process LAP response to get actions using chained IK for cartesian deltas."""
-    pred_action_chunk = response["actions"].copy()
+    # pred_action_chunk = response["actions"].copy()
+    pred_action_chunk = np.zeros((5, 14))  # Dummy zero actions for testing
 
     print(pred_action_chunk)
 
@@ -250,15 +269,20 @@ def get_action_from_response(response, curr_obs, physics):
 
     full_actions = []
     for action in pred_action_chunk:
-        # --- ROTATION LOGIC ---
         dpos = action[:3]
         deuler = action[3:6]
 
+        # deuler[0] = 0.05
+        dpos[0] = 0.01
+
         dpos[0] *= -1
         dpos[1] *= -1
-        # deuler *= 0
-        # dpos *= 0
-        # dpos[2] = 0.01
+
+        roll = deuler[0]
+        yaw = deuler[2]
+        deuler[0] = -yaw
+        deuler[2] = roll
+
 
         # Apply deltas directly in raw world frame.
         R_delta = st.Rotation.from_euler("xyz", deuler).as_matrix()
@@ -434,6 +458,9 @@ def run_episode(
 
     print("Homing...")
     timestep = _append_task_instruction(env.reset(), constant_instruction)
+    # Capture home position for action-consistent position observations.
+    SITE_NAME = "right\\gripper"
+    home_pos = env.wrapped_env.physics.named.data.site_xpos[SITE_NAME].copy()
     frames = []
     wrist_frames = []
     right_wrist_frames = []
@@ -451,7 +478,7 @@ def run_episode(
         i += 1
         frame_start_time = time.time()
         curr_obs = extract_lap_observation(
-            timestep.observation, env.wrapped_env.physics
+            timestep.observation, env.wrapped_env.physics, home_pos=home_pos
         )
 
         # Wait for camera images to become available (camera observables may be
@@ -465,7 +492,7 @@ def run_episode(
             timestep = env.step(action=_INIT_ACTION)
             timestep = _append_task_instruction(timestep, constant_instruction)
             curr_obs = extract_lap_observation(
-                timestep.observation, env.wrapped_env.physics
+                timestep.observation, env.wrapped_env.physics, home_pos=home_pos
             )
             waited += 1
         if curr_obs["right_image"] is None or curr_obs["wrist_image"] is None:
@@ -476,7 +503,8 @@ def run_episode(
             request = obs_to_request(curr_obs, constant_instruction)
             if flags.FLAGS.debug_viz and (i % flags.FLAGS.debug_viz_every == 0):
                 visualize_policy_input(request, curr_obs, step=i, task_name=task_name)
-            response = policy_client.infer(request)
+            # response = policy_client.infer(request)
+            response = {}
             pred_action_chunk = get_action_from_response(
                 response, curr_obs, env.wrapped_env.physics
             )
@@ -554,9 +582,9 @@ def run_episode(
 
 def main(_):
     # Create policy client
-    policy_client = websocket_client_policy.WebsocketClientPolicy(
-        flags.FLAGS.remote_host, flags.FLAGS.remote_port
-    )
+    # policy_client = websocket_client_policy.WebsocketClientPolicy(
+    #     flags.FLAGS.remote_host, flags.FLAGS.remote_port
+    # )
 
     success_rates = {}
     all_tasks = list(task_suite.TASK_FACTORIES.keys())
@@ -568,7 +596,7 @@ def main(_):
         success_count = 0
         for ep_idx in range(flags.FLAGS.num_episode_per_task):
             env = task_suite.create_task_env(
-                task_name, time_limit=80.0, mjcf_root=flags.FLAGS.mjcf_root
+                task_name, time_limit=10.0, mjcf_root=flags.FLAGS.mjcf_root
             )
 
             VLA_FREQ = 10  # Hz
@@ -597,7 +625,7 @@ def main(_):
                 task_name,
                 ep_idx,
                 env,
-                policy_client,
+                None,
                 user_instruction,
                 flags.FLAGS.open_loop_horizon,
                 steps_per_vla_action=steps_per_vla_action,
